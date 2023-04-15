@@ -110,16 +110,6 @@ def playMovie():
 	global currentMoviePlaying
 	global movieAdded
 
-	#movie = ''
-	# print('Angry ',Angry)
-	# print('Disgust ',Disgust)
-	# print('Fear ',Fear)
-	# print('Happy ',Happy)
-	# print('Sad ',Sad)
-	# print('Surprise ',Surprise)
-	# print('Neutral ',Neutral)
-	# print('countMovieAddedToPlayList ',countMovieAddedToPlayList)
-
 	moviesByOrder = list(filter(lambda m: m.order == countMovieAddedToPlayList, list(movie_files)))
 
 	moviesOrderedAngry = list(filter(lambda m: m.emotion == 'Angry' , moviesByOrder))
@@ -197,22 +187,6 @@ def playMovie():
 		Surprise = 0
 		Neutral = 0
 		movieAdded = False
-
-""" 	if Happy > 10 and happyPlayed == False:
-		happyPlayed = True
-		media_list.add_media(movie_files[0].path)
-  
-	if Angry > 10 and angryPlayed == False: 
-		angryPlayed = True
-		media_list.add_media(movie_files[1])
-
-	if Surprise > 10 and surprisePlayed == False: 
-		surprisePlayed = True
-		media_list.add_media(movie_files[2])
-
-	if Sad > 10 and sadPlayed == False: 
-		sadPlayed = True
-		media_list.add_media(movie_files[3]) """
 
 
 
