@@ -74,6 +74,7 @@ def addMovies():
 			movie_files.append(Movie(movie_file,'movie/'+str(movie_file)+'.mp4',randomScore,randomEmotion,j))
 	input("Press Enter to continue...")
 
+
 def ponderingEmotion(emotion,score):
 	emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 	global Angry
@@ -91,6 +92,11 @@ def ponderingEmotion(emotion,score):
 	if emotion == emotion_labels[5]: Surprise = Surprise + score
 	if emotion == emotion_labels[6]: Neutral = Neutral + score
 
+def filterMoviesByEmotion(movies, emotion):
+	return list(filter(lambda m: m.emotion == emotion , movies))
+
+def filterMoviesByScore(movies, emotion):
+	return list(filter(lambda m: emotion >= m.score  , movies))
 
 def playMovie():
 	global Angry
@@ -112,21 +118,21 @@ def playMovie():
 
 	moviesByOrder = list(filter(lambda m: m.order == countMovieAddedToPlayList, list(movie_files)))
 
-	moviesOrderedAngry = list(filter(lambda m: m.emotion == 'Angry' , moviesByOrder))
-	moviesOrderedDisgust = list(filter(lambda m: m.emotion == 'Disgust' , moviesByOrder))
-	moviesOrderedFear = list(filter(lambda m: m.emotion == 'Fear' , moviesByOrder))
-	moviesOrderedHappy = list(filter(lambda m: m.emotion == 'Happy' , moviesByOrder))
-	moviesOrderedSad = list(filter(lambda m: m.emotion == 'Sad' , moviesByOrder))
-	moviesOrderedSurprise = list(filter(lambda m: m.emotion == 'Surprise' , moviesByOrder))
-	moviesOrderedNeutral = list(filter(lambda m: m.emotion == 'Neutral' , moviesByOrder))
+	moviesOrderedAngry = filterMoviesByEmotion(moviesByOrder, 'Angry')
+	moviesOrderedDisgust = filterMoviesByEmotion(moviesByOrder, 'Disgust')
+	moviesOrderedFear = filterMoviesByEmotion(moviesByOrder, 'Fear')
+	moviesOrderedHappy = filterMoviesByEmotion(moviesByOrder, 'Happy')
+	moviesOrderedSad = filterMoviesByEmotion(moviesByOrder, 'Sad')
+	moviesOrderedSurprise = filterMoviesByEmotion(moviesByOrder, 'Surprise')
+	moviesOrderedNeutral = filterMoviesByEmotion(moviesByOrder, 'Neutral')
 
-	moviesSelectedAngry = list(filter(lambda m: Angry >= m.score  , moviesOrderedAngry))
-	moviesSelectedDisgust = list(filter(lambda m: Disgust >= m.score, moviesOrderedDisgust))
-	moviesSelectedFear = list(filter(lambda m: Fear >= m.score, moviesOrderedFear))
-	moviesSelectedHappy = list(filter(lambda m: Happy >= m.score , moviesOrderedHappy))
-	moviesSelectedSad = list(filter(lambda m: Sad >= m.score, moviesOrderedSad))
-	moviesSelectedSurprise = list(filter(lambda m: Surprise >= m.score, moviesOrderedSurprise))
-	moviesSelectedNeutral = list(filter(lambda m: Neutral >= m.score, moviesOrderedNeutral))
+	moviesSelectedAngry = filterMoviesByScore(moviesOrderedAngry, Angry)
+	moviesSelectedDisgust = filterMoviesByScore(moviesOrderedDisgust,Disgust) 
+	moviesSelectedFear = filterMoviesByScore(moviesOrderedFear,Fear)
+	moviesSelectedHappy = filterMoviesByScore(moviesOrderedHappy,Happy)
+	moviesSelectedSad = filterMoviesByScore(moviesOrderedSad,Sad)
+	moviesSelectedSurprise = filterMoviesByScore(moviesOrderedSurprise,Surprise)
+	moviesSelectedNeutral = filterMoviesByScore(moviesOrderedNeutral,Neutral)
 	
 	movieSelected = False
 
