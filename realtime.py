@@ -1,5 +1,5 @@
 from deepface.detectors import FaceDetector
-from deepface.commons import functions, realtime, distance as dst
+from deepface.commons import functions, distance as dst
 from deepface.extendedmodels import Age
 from deepface import DeepFace
 import os
@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import cv2
 import time
-import re
 # importing vlc module
 import vlc
 import random
@@ -21,180 +20,122 @@ media_list = player.media_list_new()
 media_player = player.media_list_player_new()
 # creating a new media
 mediaStart = player.media_new('movie/start.mp4')
-movie_files = []
+movie_files = {}
 currentMoviePlaying = 'file:///C:/Users/NeN/Reconocimiento%20Emociones/movie/start.mp4'
-
-Angry = 0
-Disgust = 0
-Fear = 0
-Happy = 0
-Sad = 0
-Surprise = 0
-Neutral = 0
-surprisePlayed = False
-angryPlayed = False
-sadPlayed = False
-happyPlayed = False
+emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+emotionScore = {
+	'Angry': 0, 'Disgust': 0, 'Fear':0, 'Happy':0, 'Sad':0, 'Surprise':0, 'Neutral':0
+}
 countMovieAddedToPlayList = 0
 movieAdded = False
 numScenes = 5
-
-import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+moviesChoosen = []
+emotionsByScene = {}
+
+class EmotionScore:
+	def __init__(self, emotion, score):
+		self.emotion = emotion
+		self.score = score
+	def toString(self):
+		return 'Emotion: '+ self.emotion + ' Score: '+ str(self.score)
 
 class Movie:
-  def __init__(self, number, path, score, emotion, order):
-    self.number = number
-    self.path = path
-    self.score = score
-    self.emotion = emotion
-    self.order = order
+	def __init__(self, number, path, score, emotion, numberScene):
+		self.number = number
+		self.path = path
+		self.score = score
+		self.emotion = emotion
+		self.numberScene = numberScene
+	def toString(self):
+		return 'Movie: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
+	def toShortString(self):
+		return 'Movie: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
+
     
 def selectRandomEmotion():
-	emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 	return random.choice(emotions)
 
 def selectRandomScore():
 	return random.randrange(2,5)
 
 def addMovies():
-	global numScenes
-	for j in range(numScenes):
-		for i in range(6):
-			movie_file = ((j * 6) + i)+1
+	for numberScene in range(numScenes):
+		moviesInScene = []
+		for numberEmotion in range((len(emotions) - 1)):
+			movie_file = ((numberScene * (len(emotions) - 1)) + numberEmotion) + 1
 			player.media_new('movie/'+str(movie_file)+'.mp4')
 			randomEmotion = selectRandomEmotion()
 			randomScore = selectRandomScore()
 			if randomEmotion == 'Neutral':
 				randomScore = randomScore * 3
-			print('movie ' + ' movie/'+str(movie_file)+'.mp4')
-			print('emotion', randomEmotion)
-			print('score', randomScore)
-			print('branch',j)
-			movie_files.append(Movie(movie_file,'movie/'+str(movie_file)+'.mp4',randomScore,randomEmotion,j))
+			movie = Movie(movie_file,'movie/'+str(movie_file)+'.mp4',randomScore,randomEmotion,numberScene)
+			print(movie.toString())
+			moviesInScene.append(movie)
+		movie_files[numberScene] = moviesInScene
 	input("Press Enter to continue...")
 
 
 def ponderingEmotion(emotion,score):
-	emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-	global Angry
-	global Disgust
-	global Fear
-	global Happy
-	global Sad
-	global Surprise
-	global Neutral
-	if emotion == emotion_labels[0]: Angry = Angry + score
-	if emotion == emotion_labels[1]: Disgust = Disgust + score
-	if emotion == emotion_labels[2]: Fear = Fear + score
-	if emotion == emotion_labels[3]: Happy = Happy + score
-	if emotion == emotion_labels[4]: Sad = Sad + score
-	if emotion == emotion_labels[5]: Surprise = Surprise + score
-	if emotion == emotion_labels[6]: Neutral = Neutral + score
+	emotionScore[emotion] = emotionScore[emotion] + score
 
 def filterMoviesByEmotion(movies, emotion):
-	return list(filter(lambda m: m.emotion == emotion , movies))
+	return list(filter(lambda m: m.emotion == emotion, movies))
 
-def filterMoviesByScore(movies, emotion):
-	return list(filter(lambda m: emotion >= m.score  , movies))
+def filterMoviesByScore(movies, score):
+	return list(filter(lambda m: score >= m.score, movies))
 
-def playMovie():
-	global Angry
-	global Disgust
-	global Fear
-	global Happy
-	global Sad
-	global Surprise
-	global Neutral
+def chooseMoviePondered():
+	moviesByScore = {}
+	movieSelected = False
+	if countMovieAddedToPlayList < numScenes:
+		moviesByScene = list(movie_files[countMovieAddedToPlayList])
 
-	global sadPlayed
-	global angryPlayed
-	global surprisePlayed
-	global happyPlayed
+		for emotion in emotions:
+			moviesByScore[emotion] = filterMoviesByScore(filterMoviesByEmotion(moviesByScene, emotion), emotionScore[emotion])
 
+		for emotion in emotions:
+			if len(list(moviesByScore[emotion])) > 0:
+				movieSelected = moviesByScore[emotion][0]
+
+		current_position = media_player.get_media_player().get_position()
+
+		# We are almost at the end of movie and no selected next movie, so select one at random
+		if current_position > 0.95 and movieSelected == False and len(moviesByScene) > 0:
+			movieSelected = moviesByScene[0]
+			print('end of movie and no selected ', movieSelected.path)
+
+	return movieSelected
+
+def addMovieToPlayList():
 	global countMovieAddedToPlayList
 	global currentMoviePlaying
 	global movieAdded
 
-	moviesByOrder = list(filter(lambda m: m.order == countMovieAddedToPlayList, list(movie_files)))
+	movieSelected = chooseMoviePondered()
 
-	moviesOrderedAngry = filterMoviesByEmotion(moviesByOrder, 'Angry')
-	moviesOrderedDisgust = filterMoviesByEmotion(moviesByOrder, 'Disgust')
-	moviesOrderedFear = filterMoviesByEmotion(moviesByOrder, 'Fear')
-	moviesOrderedHappy = filterMoviesByEmotion(moviesByOrder, 'Happy')
-	moviesOrderedSad = filterMoviesByEmotion(moviesByOrder, 'Sad')
-	moviesOrderedSurprise = filterMoviesByEmotion(moviesByOrder, 'Surprise')
-	moviesOrderedNeutral = filterMoviesByEmotion(moviesByOrder, 'Neutral')
-
-	moviesSelectedAngry = filterMoviesByScore(moviesOrderedAngry, Angry)
-	moviesSelectedDisgust = filterMoviesByScore(moviesOrderedDisgust,Disgust) 
-	moviesSelectedFear = filterMoviesByScore(moviesOrderedFear,Fear)
-	moviesSelectedHappy = filterMoviesByScore(moviesOrderedHappy,Happy)
-	moviesSelectedSad = filterMoviesByScore(moviesOrderedSad,Sad)
-	moviesSelectedSurprise = filterMoviesByScore(moviesOrderedSurprise,Surprise)
-	moviesSelectedNeutral = filterMoviesByScore(moviesOrderedNeutral,Neutral)
-	
-	movieSelected = False
-
-	if len(moviesSelectedHappy) > 0:
-		movieSelected = moviesSelectedHappy[0]
-	elif len(moviesSelectedSurprise) > 0:
-		movieSelected = moviesSelectedSurprise[0]
-	elif len(moviesSelectedFear) > 0:
-		movieSelected = moviesSelectedFear[0]
-	elif len(moviesSelectedSad) > 0:
-		movieSelected = moviesSelectedSad[0]
-	elif len(moviesSelectedDisgust) > 0:
-		movieSelected = moviesSelectedDisgust[0]
-	elif len(moviesSelectedAngry) > 0:
-		movieSelected = moviesSelectedAngry[0]
-	elif len(moviesSelectedNeutral) > 0:
-		movieSelected = moviesSelectedNeutral[0]
-	
-	
 	actualMoviePlaying = media_player.get_media_player().get_media().get_mrl()
-	
-	# print('actualMoviePlaying ',actualMoviePlaying)
-
-	# print('currentMoviePlaying ', currentMoviePlaying)
-
-	current_position = media_player.get_media_player().get_position()
-
-	# print('current_position ',current_position)
-
-	# We are almost at the end of movie and no selected next movie, so select one at random
-	if current_position > 0.95 and movieSelected == False and len(moviesByOrder) > 0:
-		movieSelected = moviesByOrder[0]
-		print('end of movie and no selected ', movieSelected.path)
 
 	if movieSelected != False and movieAdded == False:
-		print('Angry ',Angry)
-		print('Disgust ',Disgust)
-		print('Fear ',Fear)
-		print('Happy ',Happy)
-		print('Sad ',Sad)
-		print('Surprise ',Surprise)
-		print('Neutral ',Neutral)
+		emotionsByScene[countMovieAddedToPlayList] = []
+		for emotion in emotions:
+			emotionsByScene[countMovieAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
+			print(emotion + ' ',emotionScore[emotion])
 		print('countMovieAddedToPlayList ',countMovieAddedToPlayList)
 		print('actualMoviePlaying ',actualMoviePlaying)
 		print('currentMoviePlaying ', currentMoviePlaying)
 		print('movieAdded ', movieSelected.path)
 		media_list.add_media(movieSelected.path)
+		moviesChoosen.append(movieSelected)
 		movieAdded = True		
-	
+		
 	if actualMoviePlaying != currentMoviePlaying:
 		countMovieAddedToPlayList = countMovieAddedToPlayList + 1
 		currentMoviePlaying = actualMoviePlaying
-		Angry = 0
-		Disgust = 0
-		Fear = 0
-		Happy = 0
-		Sad = 0
-		Surprise = 0
-		Neutral = 0
 		movieAdded = False
-
-
+		for emotion in emotions:
+			emotionScore[emotion] = 0
+		
 
 def startMovie():
 	media_list.add_media(mediaStart)
@@ -202,7 +143,6 @@ def startMovie():
 	media_player.set_media_list(media_list)
 	# start playing video
 	media_player.play()
-
 
 
 def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance_metric='cosine', enable_face_analysis=True, source=0, time_threshold=5, frame_threshold=5):
@@ -452,7 +392,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 								ponderingEmotion(instance['emotion'], emotion_score)
 
-								playMovie()
+								addMovieToPlayList()
 
 								bar_x = 35  # this is the size if an emotion is 100%
 								bar_x = int(bar_x * emotion_score)
@@ -667,9 +607,38 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	cap.release()
 	cv2.destroyAllWindows()
 
+def checkMovieChoosen(movie):
+	for movieChoosen in moviesChoosen:
+		if movie.number == movieChoosen.number:
+			return True 
+	return False
+
+def getFinalDecisionChoosen():
+	result = ''
+	for scene in range(numScenes):
+		result+='\r\n------------ Scene: '+str(scene)+' ----------------- \r\n'
+		result+='------------ Emotions Results ----------------- \r\n'
+		for emotionResult in list(emotionsByScene.get(scene, [])):
+			result+= emotionResult.toString() + '\r\n'
+		result+='------------ Graph Results ----------------- \r\n'
+		for movie in movie_files[scene]:
+			if checkMovieChoosen(movie):
+				result += '**Choosen: ' + movie.toShortString()
+			else:
+				result += movie.toShortString()
+			result += '\t'
+		result += '\r\n'
+	return result
+
 
 addMovies()
 
 startMovie()
 
 analysis('','Facenet',time_threshold=0.1,frame_threshold=1)
+
+finalDecision = getFinalDecisionChoosen()
+
+print(finalDecision)
+
+input("Press Enter to continue...")
