@@ -32,6 +32,26 @@ numScenes = 5
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 moviesChosen = []
 emotionsByScene = {}
+models = [
+  "VGG-Face", 
+  "Facenet", 
+  "Facenet512", 
+  "OpenFace", 
+  "DeepFace", 
+  "DeepID", 
+  "ArcFace", 
+  "Dlib", 
+  "SFace",
+]
+
+backends = [
+  'opencv', 
+  'ssd', 
+  'dlib', 
+  'mtcnn', 
+  'retinaface', 
+  'mediapipe'
+]
 
 class EmotionScore:
 	def __init__(self, emotion, score):
@@ -53,6 +73,13 @@ class Movie:
 		return 'Movie: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
 	def toGraphString(self):
 		return str(self.numberScene)+'-'+self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
+
+def testMoviesChosen():
+	for numberScene in range(numScenes):
+		randomEmotion = selectRandomEmotion()
+		randomScore = selectRandomScore()
+		movie = Movie(numberScene,'movie/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
+		moviesChosen.append(movie)
 
     
 def selectRandomEmotion():
@@ -76,14 +103,6 @@ def addMovies():
 			moviesInScene.append(movie)
 		movie_files[numberScene] = moviesInScene
 	input("Press Enter to continue...")
-
-
-def testMoviesChosen():
-	for numberScene in range(numScenes):
-		randomEmotion = selectRandomEmotion()
-		randomScore = selectRandomScore()
-		movie = Movie(numberScene,'movie/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
-		moviesChosen.append(movie)
 
 def ponderingEmotion(emotion,score):
 	emotionScore[emotion] = emotionScore[emotion] + score
@@ -145,14 +164,12 @@ def addMovieToPlayList():
 		for emotion in emotions:
 			emotionScore[emotion] = 0
 		
-
 def startMovie():
 	media_list.add_media(mediaStart)
 	# setting media list to the mediaplayer
 	media_player.set_media_list(media_list)
 	# start playing video
 	media_player.play()
-
 
 def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance_metric='cosine', enable_face_analysis=True, source=0, time_threshold=5, frame_threshold=5):
 	# ------------------------
@@ -614,13 +631,11 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	cap.release()
 	cv2.destroyAllWindows()
 
-
 def checkMovieChosen(movie):
 	for movieChosen in moviesChosen:
 		if movie.number == movieChosen.number:
 			return True 
 	return False
-
 
 def getFinalDecisionChosen():
 	result = ''
@@ -680,7 +695,7 @@ addMovies()
 
 startMovie()
 
-analysis('','Facenet',time_threshold=0.1,frame_threshold=1)
+analysis('',models[1], detector_backend=backends[3],time_threshold=0.1,frame_threshold=1)
 
 finalDecision = getFinalDecisionChosen()
 
