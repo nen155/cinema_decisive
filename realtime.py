@@ -30,7 +30,7 @@ countMovieAddedToPlayList = 0
 movieAdded = False
 numScenes = 5
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-moviesChoosen = []
+moviesChosen = []
 emotionsByScene = {}
 
 class EmotionScore:
@@ -51,6 +51,8 @@ class Movie:
 		return 'Movie: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
 	def toShortString(self):
 		return 'Movie: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
+	def toGraphString(self):
+		return str(self.numberScene)+'-'+self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
 
     
 def selectRandomEmotion():
@@ -75,6 +77,13 @@ def addMovies():
 		movie_files[numberScene] = moviesInScene
 	input("Press Enter to continue...")
 
+
+def testMoviesChosen():
+	for numberScene in range(numScenes):
+		randomEmotion = selectRandomEmotion()
+		randomScore = selectRandomScore()
+		movie = Movie(numberScene,'movie/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
+		moviesChosen.append(movie)
 
 def ponderingEmotion(emotion,score):
 	emotionScore[emotion] = emotionScore[emotion] + score
@@ -126,7 +135,7 @@ def addMovieToPlayList():
 		print('currentMoviePlaying ', currentMoviePlaying)
 		print('movieAdded ', movieSelected.path)
 		media_list.add_media(movieSelected.path)
-		moviesChoosen.append(movieSelected)
+		moviesChosen.append(movieSelected)
 		movieAdded = True		
 		
 	if actualMoviePlaying != currentMoviePlaying:
@@ -146,8 +155,6 @@ def startMovie():
 
 
 def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance_metric='cosine', enable_face_analysis=True, source=0, time_threshold=5, frame_threshold=5):
-	global countMovieAddedToPlayList
-	global numScenes
 	# ------------------------
 
 	face_detector = FaceDetector.build_model(detector_backend)
@@ -607,13 +614,15 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	cap.release()
 	cv2.destroyAllWindows()
 
-def checkMovieChoosen(movie):
-	for movieChoosen in moviesChoosen:
-		if movie.number == movieChoosen.number:
+
+def checkMovieChosen(movie):
+	for movieChosen in moviesChosen:
+		if movie.number == movieChosen.number:
 			return True 
 	return False
 
-def getFinalDecisionChoosen():
+
+def getFinalDecisionChosen():
 	result = ''
 	for scene in range(numScenes):
 		result+='\r\n------------ Scene: '+str(scene)+' ----------------- \r\n'
@@ -622,14 +631,50 @@ def getFinalDecisionChoosen():
 			result+= emotionResult.toString() + '\r\n'
 		result+='------------ Graph Results ----------------- \r\n'
 		for movie in movie_files[scene]:
-			if checkMovieChoosen(movie):
-				result += '**Choosen: ' + movie.toShortString()
+			if checkMovieChosen(movie):
+				result += '**Chosen: ' + movie.toShortString()
 			else:
 				result += movie.toShortString()
 			result += '\t'
 		result += '\r\n'
 	return result
 
+def drawGraphFinalDecisionChosen():
+	import networkx as nx
+	import matplotlib.pyplot as plt
+	# Crear un grafo vacío
+	G = nx.Graph()
+	moviesHasBeenChosen = []
+	node_format = {'start.mp4': {'color':'red', 'size': 300} }
+	node_position = {'start.mp4': (10,75)}
+
+	# Agregar nodos al grafo
+	lastMovieChosen = 'start.mp4'
+	G.add_node('start.mp4')
+	for scene in range(numScenes):
+		for index,movie in enumerate(movie_files[scene]):
+			node_position[movie.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
+			if checkMovieChosen(movie):
+				if len(moviesHasBeenChosen) > 0:
+					lastMovieChosen = moviesHasBeenChosen[len(moviesHasBeenChosen) -1]
+				G.add_node(movie.toGraphString())
+				G.add_edge(lastMovieChosen, movie.toGraphString())
+				moviesHasBeenChosen.append(movie.toGraphString())
+				node_format[movie.toGraphString()] = {'color':'red', 'size': 300}
+			else:
+				G.add_node(movie.toGraphString())
+				node_format[movie.toGraphString()] = {'color':'blue', 'size': 300}
+			
+
+	# Dibujar el grafo
+	nx.draw(G, node_position, with_labels=True, node_shape = "D", arrows = True, font_size=8, node_color=[node_format[node]['color'] for node in G.nodes()], node_size=[node_format[node]['size'] for node in G.nodes()])
+	plt.show()
+
+# addMovies()
+
+# testMoviesChosen()
+
+# drawGraphFinalDecisionChosen()
 
 addMovies()
 
@@ -637,7 +682,9 @@ startMovie()
 
 analysis('','Facenet',time_threshold=0.1,frame_threshold=1)
 
-finalDecision = getFinalDecisionChoosen()
+finalDecision = getFinalDecisionChosen()
+
+drawGraphFinalDecisionChosen()
 
 print(finalDecision)
 
