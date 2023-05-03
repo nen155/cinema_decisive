@@ -28,6 +28,7 @@ emotionScore = {
 }
 countMovieAddedToPlayList = 0
 movieAdded = False
+baseMovieSelected = False
 numScenes = 5
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 moviesChosen = []
@@ -102,7 +103,7 @@ def addMovies():
 			print(movie.toString())
 			moviesInScene.append(movie)
 		movie_files[numberScene] = moviesInScene
-	input("Press Enter to continue...")
+	#input("Press Enter to continue...")
 
 def ponderingEmotion(emotion,score):
 	emotionScore[emotion] = emotionScore[emotion] + score
@@ -114,8 +115,11 @@ def filterMoviesByScore(movies, score):
 	return list(filter(lambda m: score >= m.score, movies))
 
 def chooseMoviePondered():
+	global movieAdded
+	global baseMovieSelected
 	moviesByScore = {}
 	movieSelected = False
+	
 	if countMovieAddedToPlayList < numScenes:
 		moviesByScene = list(movie_files[countMovieAddedToPlayList])
 
@@ -129,11 +133,35 @@ def chooseMoviePondered():
 		current_position = media_player.get_media_player().get_position()
 
 		# We are almost at the end of movie and no selected next movie, so select one at random
-		if current_position > 0.95 and movieSelected == False and len(moviesByScene) > 0:
+		if current_position > 0.90 and movieSelected == False and len(moviesByScene) > 0 and baseMovieSelected == False:
 			movieSelected = moviesByScene[0]
 			print('end of movie and no selected ', movieSelected.path)
+			baseMovieSelected = True
 
 	return movieSelected
+
+def cleanEmotionScore():
+	for emotion in emotions:
+		emotionScore[emotion] = 0
+
+def nextMovie(actualMoviePlaying):
+	global countMovieAddedToPlayList
+	global currentMoviePlaying
+	global movieAdded
+	global baseMovieSelected
+
+	if actualMoviePlaying != currentMoviePlaying:
+		countMovieAddedToPlayList = countMovieAddedToPlayList + 1
+		currentMoviePlaying = actualMoviePlaying
+		movieAdded = False
+		baseMovieSelected = False		
+		cleanEmotionScore()
+
+def addScoreEmotionToScene():
+	emotionsByScene[countMovieAddedToPlayList] = []
+	for emotion in emotions:
+		emotionsByScene[countMovieAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
+		print(emotion + ' ',emotionScore[emotion])
 
 def addMovieToPlayList():
 	global countMovieAddedToPlayList
@@ -144,25 +172,17 @@ def addMovieToPlayList():
 
 	actualMoviePlaying = media_player.get_media_player().get_media().get_mrl()
 
-	if movieSelected != False and movieAdded == False:
-		emotionsByScene[countMovieAddedToPlayList] = []
-		for emotion in emotions:
-			emotionsByScene[countMovieAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
-			print(emotion + ' ',emotionScore[emotion])
+	if movieSelected != False and (movieAdded == False or baseMovieSelected == True):
+		addScoreEmotionToScene()
+		media_list.add_media(movieSelected.path)
+		moviesChosen.append(movieSelected)
+		movieAdded = True
 		print('countMovieAddedToPlayList ',countMovieAddedToPlayList)
 		print('actualMoviePlaying ',actualMoviePlaying)
 		print('currentMoviePlaying ', currentMoviePlaying)
 		print('movieAdded ', movieSelected.path)
-		media_list.add_media(movieSelected.path)
-		moviesChosen.append(movieSelected)
-		movieAdded = True		
 		
-	if actualMoviePlaying != currentMoviePlaying:
-		countMovieAddedToPlayList = countMovieAddedToPlayList + 1
-		currentMoviePlaying = actualMoviePlaying
-		movieAdded = False
-		for emotion in emotions:
-			emotionScore[emotion] = 0
+	nextMovie(actualMoviePlaying)
 		
 def startMovie():
 	media_list.add_media(mediaStart)
@@ -622,6 +642,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 				freezed_frame = 0
 
 		else:
+			addMovieToPlayList()
 			cv2.imshow('img',img)
 
 		if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
@@ -630,6 +651,8 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	# kill open cv things
 	cap.release()
 	cv2.destroyAllWindows()
+
+#Post Process decisions
 
 def checkMovieChosen(movie):
 	for movieChosen in moviesChosen:
@@ -654,36 +677,93 @@ def getFinalDecisionChosen():
 		result += '\r\n'
 	return result
 
+def getImage(path):
+   from matplotlib.offsetbox import OffsetImage
+   import matplotlib.pyplot as plt
+   return OffsetImage(plt.imread(path, format="png"), zoom=.07)
+
+def generateQrCode(data):
+	# Importing library
+	import qrcode
+	
+	qr = qrcode.QRCode(version = 1,
+                   box_size = 50,
+                   border = 5)
+
+	# Encoding data using make() function
+	qr.add_data(data)
+ 
+	qr.make(fit = True)
+	img = qr.make_image(fill_color = 'black',
+						back_color = 'white')
+	img.save("qrcode.png")
+
 def drawGraphFinalDecisionChosen():
 	import networkx as nx
 	import matplotlib.pyplot as plt
+	from matplotlib.offsetbox import AnnotationBbox
 	# Crear un grafo vacío
 	G = nx.Graph()
 	moviesHasBeenChosen = []
+	objectsMoviesChosen = []
 	node_format = {'start.mp4': {'color':'red', 'size': 300} }
-	node_position = {'start.mp4': (10,75)}
+	node_position = {'start.mp4': (13,75)}
+
+	plt.rcParams["figure.figsize"] = [7.50, 3.50]
+	plt.rcParams["figure.autolayout"] = True
+	fig, ax = plt.subplots()
 
 	# Agregar nodos al grafo
 	lastMovieChosen = 'start.mp4'
 	G.add_node('start.mp4')
 	for scene in range(numScenes):
+
+		G.add_node("Scene: "+str(scene+1))
+		# Scene node position	
+		node_position["Scene: "+str(scene+1)] = ( ((scene+1) * 10) + 10 , 46 + len(movie_files[scene])*10 )
+		node_format["Scene: "+str(scene+1)] = {'color':'blue', 'size': 0}
+			
 		for index,movie in enumerate(movie_files[scene]):
+			
 			node_position[movie.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
+
+			ab = AnnotationBbox(getImage("film.png"), ( ((scene+1) * 10) + 10 , (index*10) + 50 ), frameon=False)
+			ax.add_artist(ab)
+			
 			if checkMovieChosen(movie):
 				if len(moviesHasBeenChosen) > 0:
 					lastMovieChosen = moviesHasBeenChosen[len(moviesHasBeenChosen) -1]
 				G.add_node(movie.toGraphString())
 				G.add_edge(lastMovieChosen, movie.toGraphString())
 				moviesHasBeenChosen.append(movie.toGraphString())
+				objectsMoviesChosen.append(movie)
 				node_format[movie.toGraphString()] = {'color':'red', 'size': 300}
 			else:
 				G.add_node(movie.toGraphString())
 				node_format[movie.toGraphString()] = {'color':'blue', 'size': 300}
-			
+	
+	# Generar QR code
+	listIdsMovies = '-'.join(list(map(lambda x : str(x.number), objectsMoviesChosen)))
+	generateQrCode(listIdsMovies)
+
+	# Qr code node graph
+	G.add_node("Share your decisions!")
+	ab = AnnotationBbox(getImage("qrcode.png"), ((numScenes*10)+20, 50), frameon=False)
+	ax.add_artist(ab)
+	node_position["Share your decisions!"] = ((numScenes*10)+20, 55)
+	node_format["Share your decisions!"] = {'color':'red', 'size': 0}
 
 	# Dibujar el grafo
-	nx.draw(G, node_position, with_labels=True, node_shape = "D", arrows = True, font_size=8, node_color=[node_format[node]['color'] for node in G.nodes()], node_size=[node_format[node]['size'] for node in G.nodes()])
-	plt.show()
+	nx.draw(G, node_position, with_labels=True, node_shape = "o", arrows = True, font_size=8, node_color=[node_format[node]['color'] for node in G.nodes()], node_size=[node_format[node]['size'] for node in G.nodes()])
+	#plt.show()
+
+	fig = plt.gcf()
+	fig.set_size_inches((15, 10), forward=False)
+	plt.savefig("node-graph-decisions.png", dpi=100)
+	graph = player.media_new("node-graph-decisions.png")
+	media_list.add_media(graph)
+	media_player.set_media_list(media_list)
+	media_player.play()
 
 # addMovies()
 
