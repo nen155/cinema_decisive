@@ -18,7 +18,7 @@ class EmotionScoreController extends Controller
     }
 
     public function showEmotions($idTake){
-        return EmotionScore::where('id_take',$idTake);
+        return EmotionScore::where('id_take',$idTake)->firstOrFail();
     }
 
 

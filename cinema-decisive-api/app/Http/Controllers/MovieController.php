@@ -17,6 +17,14 @@ class MovieController extends Controller
         return Movie::all();
     }
 
+    public function showMovie($id){
+        try{
+            return Movie::where('id','=',$id)->firstOrFail();
+        }catch(\Exception $exception){
+            error_log($exception);
+        }
+    }
+
     public function create(Request $request){
         try{
 
@@ -47,11 +55,11 @@ class MovieController extends Controller
 
             $movie = Movie::where('id',$movieRequest->id)->firstOrFail();
 
-            $imageObj = $this->saveImage($request, $movie->id);
-
             $movie->name = $movieRequest->name;
             $movie->duration = $movieRequest->duration;
             $movie->number_scenes = $movieRequest->number_scenes;
+
+            $imageObj = $this->saveImage($request, $movie->id);
 
             if(isset($imageObj["image"])){
                 $movie->image_path = "movies/".$movieRequest->id."_". $imageObj["path"];
@@ -78,7 +86,8 @@ class MovieController extends Controller
             $image->store('public/uploads');
             $image->move(public_path('movies'), $idMovie."_". $name);
             $path = $name;
+            return ["image"=>$image, "path" => $path, "name" => $name];
         }
-        return ["image"=>$image, "path" => $path, "name" => $name];
+       return [];
     }
 }

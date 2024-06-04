@@ -18,7 +18,7 @@ class SceneController extends Controller
     }
 
     public function showScenes($idMovie){
-        return Scene::where('id_movie',$idMovie);
+        return Scene::where('id_movie',$idMovie)->firstOrFail();
     }
 
     public function create(Request $request){
