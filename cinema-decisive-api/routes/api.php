@@ -5,6 +5,7 @@ use App\Http\Controllers\EmotionController;
 use App\Http\Controllers\EmotionScoreController;
 use App\Http\Controllers\TakeController;
 use App\Http\Controllers\MovieController;
+use App\Http\Controllers\SceneController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
