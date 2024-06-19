@@ -19,19 +19,19 @@ media_list = player.media_list_new()
 # creating a media player object
 media_player = player.media_list_player_new()
 # creating a new media
-mediaStart = player.media_new('movie/start.mp4')
-movie_files = {}
-currentMoviePlaying = 'file:///C:/Users/NeN/Reconocimiento%20Emociones/movie/start.mp4'
+mediaStart = player.media_new('clip/start.mp4')
+clip_files = {}
+currentClipPlaying = 'file:///C:/Users/NeN/Reconocimiento%20Emociones/clip/start.mp4'
 emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 emotionScore = {
 	'Angry': 0, 'Disgust': 0, 'Fear':0, 'Happy':0, 'Sad':0, 'Surprise':0, 'Neutral':0
 }
-countMovieAddedToPlayList = 0
-movieAdded = False
-baseMovieSelected = False
+countClipAddedToPlayList = 0
+clipAdded = False
+baseClipSelected = False
 numScenes = 5
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-moviesChosen = []
+clipsChosen = []
 emotionsByScene = {}
 models = [
   "VGG-Face", 
@@ -61,7 +61,7 @@ class EmotionScore:
 	def toString(self):
 		return 'Emotion: '+ self.emotion + ' Score: '+ str(self.score)
 
-class Movie:
+class Clip:
 	def __init__(self, number, path, score, emotion, numberScene):
 		self.number = number
 		self.path = path
@@ -69,18 +69,18 @@ class Movie:
 		self.emotion = emotion
 		self.numberScene = numberScene
 	def toString(self):
-		return 'Movie: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
+		return 'Clip: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
 	def toShortString(self):
-		return 'Movie: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
+		return 'Clip: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
 	def toGraphString(self):
 		return str(self.numberScene)+'-'+self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
 
-def testMoviesChosen():
+def testClipsChosen():
 	for numberScene in range(numScenes):
 		randomEmotion = selectRandomEmotion()
 		randomScore = selectRandomScore()
-		movie = Movie(numberScene,'movie/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
-		moviesChosen.append(movie)
+		clip = Clip(numberScene,'clip/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
+		clipsChosen.append(clip)
 
     
 def selectRandomEmotion():
@@ -89,102 +89,102 @@ def selectRandomEmotion():
 def selectRandomScore():
 	return random.randrange(2,5)
 
-def addMovies():
+def addClips():
 	for numberScene in range(numScenes):
-		moviesInScene = []
+		clipsInScene = []
 		for numberEmotion in range((len(emotions) - 1)):
-			movie_file = ((numberScene * (len(emotions) - 1)) + numberEmotion) + 1
-			player.media_new('movie/'+str(movie_file)+'.mp4')
+			clip_file = ((numberScene * (len(emotions) - 1)) + numberEmotion) + 1
+			player.media_new('clip/'+str(clip_file)+'.mp4')
 			randomEmotion = selectRandomEmotion()
 			randomScore = selectRandomScore()
 			if randomEmotion == 'Neutral':
 				randomScore = randomScore * 3
-			movie = Movie(movie_file,'movie/'+str(movie_file)+'.mp4',randomScore,randomEmotion,numberScene)
-			print(movie.toString())
-			moviesInScene.append(movie)
-		movie_files[numberScene] = moviesInScene
+			clip = Clip(clip_file,'clip/'+str(clip_file)+'.mp4',randomScore,randomEmotion,numberScene)
+			print(clip.toString())
+			clipsInScene.append(clip)
+		clip_files[numberScene] = clipsInScene
 	#input("Press Enter to continue...")
 
 def ponderingEmotion(emotion,score):
 	emotionScore[emotion] = emotionScore[emotion] + score
 
-def filterMoviesByEmotion(movies, emotion):
-	return list(filter(lambda m: m.emotion == emotion, movies))
+def filterClipsByEmotion(clips, emotion):
+	return list(filter(lambda m: m.emotion == emotion, clips))
 
-def filterMoviesByScore(movies, score):
-	return list(filter(lambda m: score >= m.score, movies))
+def filterClipsByScore(clips, score):
+	return list(filter(lambda m: score >= m.score, clips))
 
-def chooseMoviePondered():
-	global movieAdded
-	global baseMovieSelected
-	moviesByScore = {}
-	movieSelected = False
+def chooseClipPondered():
+	global clipAdded
+	global baseClipSelected
+	clipsByScore = {}
+	clipSelected = False
 	
-	if countMovieAddedToPlayList < numScenes:
-		moviesByScene = list(movie_files[countMovieAddedToPlayList])
+	if countClipAddedToPlayList < numScenes:
+		clipsByScene = list(clip_files[countClipAddedToPlayList])
 
 		for emotion in emotions:
-			moviesByScore[emotion] = filterMoviesByScore(filterMoviesByEmotion(moviesByScene, emotion), emotionScore[emotion])
+			clipsByScore[emotion] = filterClipsByScore(filterClipsByEmotion(clipsByScene, emotion), emotionScore[emotion])
 
 		for emotion in emotions:
-			if len(list(moviesByScore[emotion])) > 0:
-				movieSelected = moviesByScore[emotion][0]
+			if len(list(clipsByScore[emotion])) > 0:
+				clipSelected = clipsByScore[emotion][0]
 
 		current_position = media_player.get_media_player().get_position()
 
-		# We are almost at the end of movie and no selected next movie, so select one at random
-		if current_position > 0.90 and movieSelected == False and len(moviesByScene) > 0 and baseMovieSelected == False:
-			movieSelected = moviesByScene[0]
-			print('end of movie and no selected ', movieSelected.path)
-			baseMovieSelected = True
+		# We are almost at the end of clip and no selected next clip, so select one at random
+		if current_position > 0.90 and clipSelected == False and len(clipsByScene) > 0 and baseClipSelected == False:
+			clipSelected = clipsByScene[0]
+			print('end of clip and no selected ', clipSelected.path)
+			baseClipSelected = True
 
-	return movieSelected
+	return clipSelected
 
 def cleanEmotionScore():
 	for emotion in emotions:
 		emotionScore[emotion] = 0
 
-def nextMovie(actualMoviePlaying):
-	global countMovieAddedToPlayList
-	global currentMoviePlaying
-	global movieAdded
-	global baseMovieSelected
+def nextClip(actualClipPlaying):
+	global countClipAddedToPlayList
+	global currentClipPlaying
+	global clipAdded
+	global baseClipSelected
 
-	if actualMoviePlaying != currentMoviePlaying:
-		countMovieAddedToPlayList = countMovieAddedToPlayList + 1
-		currentMoviePlaying = actualMoviePlaying
-		movieAdded = False
-		baseMovieSelected = False		
+	if actualClipPlaying != currentClipPlaying:
+		countClipAddedToPlayList = countClipAddedToPlayList + 1
+		currentClipPlaying = actualClipPlaying
+		clipAdded = False
+		baseClipSelected = False		
 		cleanEmotionScore()
 
 def addScoreEmotionToScene():
-	emotionsByScene[countMovieAddedToPlayList] = []
+	emotionsByScene[countClipAddedToPlayList] = []
 	for emotion in emotions:
-		emotionsByScene[countMovieAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
+		emotionsByScene[countClipAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
 		print(emotion + ' ',emotionScore[emotion])
 
-def addMovieToPlayList():
-	global countMovieAddedToPlayList
-	global currentMoviePlaying
-	global movieAdded
+def addClipToPlayList():
+	global countClipAddedToPlayList
+	global currentClipPlaying
+	global clipAdded
 
-	movieSelected = chooseMoviePondered()
+	clipSelected = chooseClipPondered()
 
-	actualMoviePlaying = media_player.get_media_player().get_media().get_mrl()
+	actualClipPlaying = media_player.get_media_player().get_media().get_mrl()
 
-	if movieSelected != False and (movieAdded == False or baseMovieSelected == True):
+	if clipSelected != False and (clipAdded == False or baseClipSelected == True):
 		addScoreEmotionToScene()
-		media_list.add_media(movieSelected.path)
-		moviesChosen.append(movieSelected)
-		movieAdded = True
-		print('countMovieAddedToPlayList ',countMovieAddedToPlayList)
-		print('actualMoviePlaying ',actualMoviePlaying)
-		print('currentMoviePlaying ', currentMoviePlaying)
-		print('movieAdded ', movieSelected.path)
+		media_list.add_media(clipSelected.path)
+		clipsChosen.append(clipSelected)
+		clipAdded = True
+		print('countClipAddedToPlayList ',countClipAddedToPlayList)
+		print('actualClipPlaying ',actualClipPlaying)
+		print('currentClipPlaying ', currentClipPlaying)
+		print('clipAdded ', clipSelected.path)
 		
-	nextMovie(actualMoviePlaying)
+	nextClip(actualClipPlaying)
 		
-def startMovie():
+def startClip():
 	media_list.add_media(mediaStart)
 	# setting media list to the mediaplayer
 	media_player.set_media_list(media_list)
@@ -303,7 +303,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 	cap = cv2.VideoCapture(source)  # webcam
 
-	while(countMovieAddedToPlayList < numScenes):
+	while(countClipAddedToPlayList < numScenes):
 		ret, img = cap.read()
 
 		if img is None:
@@ -436,7 +436,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 								ponderingEmotion(instance['emotion'], emotion_score)
 
-								addMovieToPlayList()
+								addClipToPlayList()
 
 								bar_x = 35  # this is the size if an emotion is 100%
 								bar_x = int(bar_x * emotion_score)
@@ -642,7 +642,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 				freezed_frame = 0
 
 		else:
-			addMovieToPlayList()
+			addClipToPlayList()
 			cv2.imshow('img',img)
 
 		if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
@@ -654,9 +654,9 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 #Post Process decisions
 
-def checkMovieChosen(movie):
-	for movieChosen in moviesChosen:
-		if movie.number == movieChosen.number:
+def checkClipChosen(clip):
+	for clipChosen in clipsChosen:
+		if clip.number == clipChosen.number:
 			return True 
 	return False
 
@@ -668,11 +668,11 @@ def getFinalDecisionChosen():
 		for emotionResult in list(emotionsByScene.get(scene, [])):
 			result+= emotionResult.toString() + '\r\n'
 		result+='------------ Graph Results ----------------- \r\n'
-		for movie in movie_files[scene]:
-			if checkMovieChosen(movie):
-				result += '**Chosen: ' + movie.toShortString()
+		for clip in clip_files[scene]:
+			if checkClipChosen(clip):
+				result += '**Chosen: ' + clip.toShortString()
 			else:
-				result += movie.toShortString()
+				result += clip.toShortString()
 			result += '\t'
 		result += '\r\n'
 	return result
@@ -704,8 +704,8 @@ def drawGraphFinalDecisionChosen():
 	from matplotlib.offsetbox import AnnotationBbox
 	# Crear un grafo vacío
 	G = nx.Graph()
-	moviesHasBeenChosen = []
-	objectsMoviesChosen = []
+	clipsHasBeenChosen = []
+	objectsClipsChosen = []
 	node_format = {'start.mp4': {'color':'red', 'size': 300} }
 	node_position = {'start.mp4': (13,75)}
 
@@ -714,37 +714,37 @@ def drawGraphFinalDecisionChosen():
 	fig, ax = plt.subplots()
 
 	# Agregar nodos al grafo
-	lastMovieChosen = 'start.mp4'
+	lastClipChosen = 'start.mp4'
 	G.add_node('start.mp4')
 	for scene in range(numScenes):
 
 		G.add_node("Scene: "+str(scene+1))
 		# Scene node position	
-		node_position["Scene: "+str(scene+1)] = ( ((scene+1) * 10) + 10 , 46 + len(movie_files[scene])*10 )
+		node_position["Scene: "+str(scene+1)] = ( ((scene+1) * 10) + 10 , 46 + len(clip_files[scene])*10 )
 		node_format["Scene: "+str(scene+1)] = {'color':'blue', 'size': 0}
 			
-		for index,movie in enumerate(movie_files[scene]):
+		for index,clip in enumerate(clip_files[scene]):
 			
-			node_position[movie.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
+			node_position[clip.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
 
 			ab = AnnotationBbox(getImage("film.png"), ( ((scene+1) * 10) + 10 , (index*10) + 50 ), frameon=False)
 			ax.add_artist(ab)
 			
-			if checkMovieChosen(movie):
-				if len(moviesHasBeenChosen) > 0:
-					lastMovieChosen = moviesHasBeenChosen[len(moviesHasBeenChosen) -1]
-				G.add_node(movie.toGraphString())
-				G.add_edge(lastMovieChosen, movie.toGraphString())
-				moviesHasBeenChosen.append(movie.toGraphString())
-				objectsMoviesChosen.append(movie)
-				node_format[movie.toGraphString()] = {'color':'red', 'size': 300}
+			if checkClipChosen(clip):
+				if len(clipsHasBeenChosen) > 0:
+					lastClipChosen = clipsHasBeenChosen[len(clipsHasBeenChosen) -1]
+				G.add_node(clip.toGraphString())
+				G.add_edge(lastClipChosen, clip.toGraphString())
+				clipsHasBeenChosen.append(clip.toGraphString())
+				objectsClipsChosen.append(clip)
+				node_format[clip.toGraphString()] = {'color':'red', 'size': 300}
 			else:
-				G.add_node(movie.toGraphString())
-				node_format[movie.toGraphString()] = {'color':'blue', 'size': 300}
+				G.add_node(clip.toGraphString())
+				node_format[clip.toGraphString()] = {'color':'blue', 'size': 300}
 	
 	# Generar QR code
-	listIdsMovies = '-'.join(list(map(lambda x : str(x.number), objectsMoviesChosen)))
-	generateQrCode(listIdsMovies)
+	listIdsClips = '-'.join(list(map(lambda x : str(x.number), objectsClipsChosen)))
+	generateQrCode(listIdsClips)
 
 	# Qr code node graph
 	G.add_node("Share your decisions!")
@@ -765,15 +765,15 @@ def drawGraphFinalDecisionChosen():
 	media_player.set_media_list(media_list)
 	media_player.play()
 
-# addMovies()
+# addClips()
 
-# testMoviesChosen()
+# testClipsChosen()
 
 # drawGraphFinalDecisionChosen()
 
-addMovies()
+addClips()
 
-startMovie()
+startClip()
 
 analysis('',models[1], detector_backend=backends[3],time_threshold=0.1,frame_threshold=1)
 
