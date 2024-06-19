@@ -19,40 +19,21 @@ media_list = player.media_list_new()
 # creating a media player object
 media_player = player.media_list_player_new()
 # creating a new media
-mediaStart = player.media_new('movie/start.mp4')
-movie_files = {}
-currentMoviePlaying = 'file:///C:/Users/NeN/Reconocimiento%20Emociones/movie/start.mp4'
+mediaStart = player.media_new('clip/start.mp4')
+clipFilesBySceneNumber = {}
+currentClipPlaying = 'file:///C:/Users/NeN/Reconocimiento%20Emociones/clip/start.mp4'
 emotions = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
 emotionScore = {
 	'Angry': 0, 'Disgust': 0, 'Fear':0, 'Happy':0, 'Sad':0, 'Surprise':0, 'Neutral':0
 }
-countMovieAddedToPlayList = 0
-movieAdded = False
-baseMovieSelected = False
+neutralEmotion = 'Neutral'
+countClipAddedToPlayList = 0
+clipAdded = False
+neutralClipSelected = False
 numScenes = 5
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-moviesChosen = []
+clipsChosen = []
 emotionsByScene = {}
-models = [
-  "VGG-Face", 
-  "Facenet", 
-  "Facenet512", 
-  "OpenFace", 
-  "DeepFace", 
-  "DeepID", 
-  "ArcFace", 
-  "Dlib", 
-  "SFace",
-]
-
-backends = [
-  'opencv', 
-  'ssd', 
-  'dlib', 
-  'mtcnn', 
-  'retinaface', 
-  'mediapipe'
-]
 
 class EmotionScore:
 	def __init__(self, emotion, score):
@@ -61,7 +42,7 @@ class EmotionScore:
 	def toString(self):
 		return 'Emotion: '+ self.emotion + ' Score: '+ str(self.score)
 
-class Movie:
+class Clip:
 	def __init__(self, number, path, score, emotion, numberScene):
 		self.number = number
 		self.path = path
@@ -69,128 +50,185 @@ class Movie:
 		self.emotion = emotion
 		self.numberScene = numberScene
 	def toString(self):
-		return 'Movie: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
+		return 'Clip: '+ self.path + '\r\nEmotion: '+ self.emotion + ' Score: '+ str(self.score) + '\r\nScene: '+ str(self.numberScene)
 	def toShortString(self):
-		return 'Movie: '+ self.path + ' Emotion: '+ self.emotion + ' Score: '+ str(self.score) + ' Scene: '+ str(self.numberScene)
+		return 'Clip: '+ self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
 	def toGraphString(self):
 		return str(self.numberScene)+'-'+self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
 
-def testMoviesChosen():
+# Testea la asignación de emociones a la película. Asigna aleatoriamente el valor emocional que queremos darle a una escena
+def testClipsChosen():
 	for numberScene in range(numScenes):
 		randomEmotion = selectRandomEmotion()
 		randomScore = selectRandomScore()
-		movie = Movie(numberScene,'movie/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
-		moviesChosen.append(movie)
+		clip = Clip(numberScene,'clip/'+str(numberScene)+'.mp4',randomScore,randomEmotion,numberScene)
+		clipsChosen.append(clip)
 
-    
+# Escoge una emoción de manera aleatoria    
 def selectRandomEmotion():
 	return random.choice(emotions)
 
+# Escoge un valor aleatorio entre 2 y 5 para darselo a una escena
 def selectRandomScore():
 	return random.randrange(2,5)
 
-def addMovies():
+# Añade por cada escena posible en la película y por cada emoción posible la puntuación de cada emoción de forma aleatoria para un clip de una escena
+def addClips():
 	for numberScene in range(numScenes):
-		moviesInScene = []
-		for numberEmotion in range((len(emotions) - 1)):
-			movie_file = ((numberScene * (len(emotions) - 1)) + numberEmotion) + 1
-			player.media_new('movie/'+str(movie_file)+'.mp4')
-			randomEmotion = selectRandomEmotion()
-			randomScore = selectRandomScore()
-			if randomEmotion == 'Neutral':
-				randomScore = randomScore * 3
-			movie = Movie(movie_file,'movie/'+str(movie_file)+'.mp4',randomScore,randomEmotion,numberScene)
-			print(movie.toString())
-			moviesInScene.append(movie)
-		movie_files[numberScene] = moviesInScene
+		clipsInScene = []
+		for numberEmotion in range(len(emotions)):
+			currentEmotion = emotions[numberEmotion]
+			clipFile = getFileName(numberScene, numberEmotion)
+			player.media_new('clip/'+str(clipFile)+'.mp4')
+			randomScore = selectRandomScore() # Se le asigna una puntuación a esa emoción (esto debería venir de BD del montador en este caso)
+			randomScore = avoidingNeutralEmotion(currentEmotion,randomScore)
+			clip = Clip(clipFile, 'clip/'+str(clipFile)+'.mp4', randomScore, currentEmotion, numberScene)
+			print(clip.toString())
+			clipsInScene.append(clip)
+		clipFilesBySceneNumber[numberScene] = clipsInScene
 	#input("Press Enter to continue...")
+		
+# Obtiene el nombre del fichero del clip de película en función del número de escenas posible y las emociones posibles (Esto vendría de BD)
+def getFileName(numberScene, numberEmotion):
+	return ((numberScene * len(emotions)) + numberEmotion) + 1 
 
-def ponderingEmotion(emotion,score):
+# Intenta que las emociones Neutrales sean las últimas en escogerse aumentando el número de puntuación a la que tiene que llegar el usuario para que la emoción sea Neutral
+def avoidingNeutralEmotion(currentEmotion, randomScore):
+	if currentEmotion == 'Neutral':
+		return randomScore * 3
+	return randomScore
+	
+# Añade puntuación a la emoción concreta
+def addScoreToEmotion(emotion,score):
 	emotionScore[emotion] = emotionScore[emotion] + score
 
-def filterMoviesByEmotion(movies, emotion):
-	return list(filter(lambda m: m.emotion == emotion, movies))
+# Busca en el listado de clips los que contengan dicha emoción
+def filterClipsByEmotion(clips, emotion):
+	return list(filter(lambda m: m.emotion == emotion, clips))
 
-def filterMoviesByScore(movies, score):
-	return list(filter(lambda m: score >= m.score, movies))
+# Busca en el listado de clips los que tengan un valor mayor a score
+def filterClipsByScore(clips, score):
+	return list(filter(lambda m: score >= m.score, clips))
 
-def chooseMoviePondered():
-	global movieAdded
-	global baseMovieSelected
-	moviesByScore = {}
-	movieSelected = False
+# Devuelve de un listado de clips el que mayor score tenga
+def findClipWithHighestScore(clips):
+	clipSelected = clips[0]
+	for clip in clips:
+		if clip.score > clipSelected.score:
+			clipSelected = clip
+	return clipSelected
+
+# Elige el siguiente clip a reproducir con mayor score, sino se escogió ninguno y se está llegando al final se elige el Neutral de esa escena
+def chooseClipWithHighestScore():
+	clipsByScore = {}
+	clipSelected = False
 	
-	if countMovieAddedToPlayList < numScenes:
-		moviesByScene = list(movie_files[countMovieAddedToPlayList])
+	if countClipAddedToPlayList < numScenes:
+		clipsByScene = list(clipFilesBySceneNumber[countClipAddedToPlayList])
+
+		currentPosition = media_player.get_media_player().get_position()
 
 		for emotion in emotions:
-			moviesByScore[emotion] = filterMoviesByScore(filterMoviesByEmotion(moviesByScene, emotion), emotionScore[emotion])
+			clipsByEmotion = filterClipsByEmotion(clipsByScene, emotion)
+			clipsByScore[emotion] = filterClipsByScore(clipsByEmotion, emotionScore[emotion])
 
-		for emotion in emotions:
-			if len(list(moviesByScore[emotion])) > 0:
-				movieSelected = moviesByScore[emotion][0]
+		clipSelected = findClipByEmotionWithHighestScore(clipsByScore, clipSelected)
 
-		current_position = media_player.get_media_player().get_position()
+		clipSelected = checkClipAtEndOfPlayback(clipsByScene, currentPosition, clipSelected)
 
-		# We are almost at the end of movie and no selected next movie, so select one at random
-		if current_position > 0.90 and movieSelected == False and len(moviesByScene) > 0 and baseMovieSelected == False:
-			movieSelected = moviesByScene[0]
-			print('end of movie and no selected ', movieSelected.path)
-			baseMovieSelected = True
+		#print('position at current clip ', currentPosition)
 
-	return movieSelected
+	return clipSelected
 
+# Busca en una lista de clips filtrados por emociones los que tengan mayor valor
+def findClipByEmotionWithHighestScore(clipsByScore, clipSelected):
+
+	for emotion in emotions:
+		if len(list(clipsByScore[emotion])) > 0:
+			clipFromEmotionWithHighScore = findClipWithHighestScore(clipsByScore[emotion])
+			if clipSelected == False:
+				clipSelected = clipFromEmotionWithHighScore
+			else:
+				if clipSelected.score < clipFromEmotionWithHighScore.score:
+					clipSelected = clipFromEmotionWithHighScore
+
+	return clipSelected
+
+# Si hemos llegado casi al final del clip y no se ha elegido un clip cogemos el Neutral
+def checkClipAtEndOfPlayback(clipsByScene, currentPosition, clipSelected):
+	global neutralClipSelected
+
+	if currentPosition > 0.90 and clipSelected == False and len(clipsByScene) > 0 and neutralClipSelected == False:
+		clipNeutralFromScene = filterClipsByEmotion(clipsByScene, neutralEmotion)
+		clipSelected = clipNeutralFromScene[0]
+		print('end of clip and no selected ', clipSelected.path)
+		neutralClipSelected = True
+
+	return clipSelected
+
+# Limpia el array de puntuaciones para las emociones
 def cleanEmotionScore():
 	for emotion in emotions:
 		emotionScore[emotion] = 0
 
-def nextMovie(actualMoviePlaying):
-	global countMovieAddedToPlayList
-	global currentMoviePlaying
-	global movieAdded
-	global baseMovieSelected
+# Actualiza el siguiente clip a reproducir si ha cambiado en la lista de reproduccion y limpia el del score anterior
+def nextClip(actualClipPlaying):
+	global countClipAddedToPlayList
+	global currentClipPlaying
+	global clipAdded
+	global neutralClipSelected
 
-	if actualMoviePlaying != currentMoviePlaying:
-		countMovieAddedToPlayList = countMovieAddedToPlayList + 1
-		currentMoviePlaying = actualMoviePlaying
-		movieAdded = False
-		baseMovieSelected = False		
+	if actualClipPlaying != currentClipPlaying:
+		countClipAddedToPlayList = countClipAddedToPlayList + 1
+		currentClipPlaying = actualClipPlaying
+		clipAdded = False
+		neutralClipSelected = False		
 		cleanEmotionScore()
 
+# Añade las puntuaciones de las emociones de la escena actual
 def addScoreEmotionToScene():
-	emotionsByScene[countMovieAddedToPlayList] = []
+	emotionsByScene[countClipAddedToPlayList] = []
 	for emotion in emotions:
-		emotionsByScene[countMovieAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
+		emotionsByScene[countClipAddedToPlayList].append(EmotionScore(emotion, emotionScore[emotion]))
 		print(emotion + ' ',emotionScore[emotion])
 
-def addMovieToPlayList():
-	global countMovieAddedToPlayList
-	global currentMoviePlaying
-	global movieAdded
+"""
+	Añade el clip con mayor puntuación o el Neutral en el caso de no encontrarlo a lista de reproducción.
+	Pasa al siguiente clip en el caso de que la lista de reproducción haya pasado a reproduccir el siguiente.
+"""
+def checkClipToAddToPlayList():
+	global countClipAddedToPlayList
+	global currentClipPlaying
+	global clipAdded
 
-	movieSelected = chooseMoviePondered()
+	clipSelected = chooseClipWithHighestScore()
 
-	actualMoviePlaying = media_player.get_media_player().get_media().get_mrl()
+	actualClipPlaying = media_player.get_media_player().get_media().get_mrl()
 
-	if movieSelected != False and (movieAdded == False or baseMovieSelected == True):
+	if clipSelected != False and (clipAdded == False or neutralClipSelected == True):
 		addScoreEmotionToScene()
-		media_list.add_media(movieSelected.path)
-		moviesChosen.append(movieSelected)
-		movieAdded = True
-		print('countMovieAddedToPlayList ',countMovieAddedToPlayList)
-		print('actualMoviePlaying ',actualMoviePlaying)
-		print('currentMoviePlaying ', currentMoviePlaying)
-		print('movieAdded ', movieSelected.path)
+		media_list.add_media(clipSelected.path)
+		clipsChosen.append(clipSelected)
+		clipAdded = True
+		print('countClipAddedToPlayList ',countClipAddedToPlayList)
+		print('actualClipPlaying ',actualClipPlaying)
+		print('currentClipPlaying ', currentClipPlaying)
+		print('clipAdded ', clipSelected.path)
 		
-	nextMovie(actualMoviePlaying)
-		
-def startMovie():
+	nextClip(actualClipPlaying)
+
+# Inicializa la lista de reproducción y la pone a reproducir		
+def startClip():
 	media_list.add_media(mediaStart)
 	# setting media list to the mediaplayer
 	media_player.set_media_list(media_list)
 	# start playing video
 	media_player.play()
 
+"""
+	1. Captura lo que se graba en la webcam o videocamara del ordenador.
+	2. Analiza de cada imagen los sentimientos del rostro del/o de los usuario/s y va actualizando el score por cada emoción que vaya/n sintiendo
+"""
 def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance_metric='cosine', enable_face_analysis=True, source=0, time_threshold=5, frame_threshold=5):
 	# ------------------------
 
@@ -299,11 +337,12 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	face_detected = False
 	face_included_frames = 0  # freeze screen if face detected sequantially 5 frames
 	freezed_frame = 0
+	# Se toma el tiempo para esperar a que se procesen las imagenes de las caras
 	tic = time.time()
-
+	# Comienza la captura de vídeo
 	cap = cv2.VideoCapture(source)  # webcam
-
-	while(countMovieAddedToPlayList < numScenes):
+	# Mientras que el número de clips añadidos a la escena sea menor que el número de escenas se procesan las emociones de los usuarios en tiempo real
+	while(countClipAddedToPlayList < numScenes):
 		ret, img = cap.read()
 
 		if img is None:
@@ -351,6 +390,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 				# -------------------------------------
 
+		# Se encuentra cara y los frames de la cara esta dentro del umbral para poder tratar la imagen y no se está procesando otra imagen
 		if face_detected == True and face_included_frames == frame_threshold and freeze == False:
 			freeze = True
 			# base_img = img.copy()
@@ -358,9 +398,11 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 			detected_faces_final = detected_faces.copy()
 			tic = time.time()
 
+		# Procesado de la imagen, se congela la imagen mientras se procesa
 		if freeze == True:
 
 			toc = time.time()
+			# Si no he pasado el umbral de tiempo para procesar la imagen continuo procesando
 			if (toc - tic) < time_threshold:
 
 				if freezed_frame == 0:
@@ -369,10 +411,10 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 					for detected_face in detected_faces_final:
 						x = detected_face[0]; y = detected_face[1]
 						w = detected_face[2]; h = detected_face[3]
-
+						
+						# dibujo un cuadrado verde en la cara
 						cv2.rectangle(freeze_img, (x, y), (x+w, y+h), (67, 67, 67),
-						              1)  # draw rectangle to main image
-
+						              1) 
 						# -------------------------------
 
 						# apply deep learning for custom_face
@@ -380,26 +422,31 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 						custom_face = base_img[y:y+h, x:x+w]
 
 						# -------------------------------
-						# facial attribute analysis
-
+						# Analisis facial (emociones, edad, )
 						if enable_face_analysis == True:
-
+							# Devuelve la imagen en gris habiendola pasado por una capa convolucional
 							gray_img = functions.preprocess_face(img=custom_face, target_size=(
-							    48, 48), grayscale=True, enforce_detection=False, detector_backend='opencv')
-							emotion_labels = ['Angry', 'Disgust', 'Fear',
-							    'Happy', 'Sad', 'Surprise', 'Neutral']
+							    48, 48), grayscale=True, enforce_detection=False, detector_backend=detector_backend)
+							
+							# -------------------------------
+							# Analisis de emociones en tiempo real
+
+							# Obtengo la predicción según el modelo de imagen convolucionada de cuales son las posibles emociones
 							emotion_predictions = emotion_model.predict(gray_img)[0, :]
+							# Obtengo el total de predicciones
 							sum_of_predictions = emotion_predictions.sum()
 
 							mood_items = []
-							for i in range(0, len(emotion_labels)):
+							# Por cada una de las emociones obtengo el nombre para el label, el porcentaje que le corresponde según la predicción del modelo y lo meto en un array de mood (animo)
+							for i in range(0, len(emotions)):
 								mood_item = []
-								emotion_label = emotion_labels[i]
+								emotion_label = emotions[i]
 								emotion_prediction = 100 * emotion_predictions[i] / sum_of_predictions
 								mood_item.append(emotion_label)
 								mood_item.append(emotion_prediction)
 								mood_items.append(mood_item)
 
+							# Con el array de emociones creo un DataFrame ordenado por score de la emoción que luego va ser pintado
 							emotion_df = pd.DataFrame(mood_items, columns=["emotion", "score"])
 							emotion_df = emotion_df.sort_values(
 							    by=["score"], ascending=False).reset_index(drop=True)
@@ -411,6 +458,8 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 							opacity = 0.4
 							dominant_emotion ='';
 
+							# -------------------------------
+							# Dibujo sobre la imagen el cuadrado para luego escribir las emociones
 							if x+w+pivot_img_size < resolution_x:
 								# right
 								cv2.rectangle(freeze_img									# , (x+w,y+20)
@@ -426,21 +475,25 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 								cv2.addWeighted(overlay, opacity, freeze_img,
 								                1 - opacity, 0, freeze_img)
-
+							# -------------------------------
+							
+							# Recorro el listado de emociones que ordenado por puntuación
 							for index, instance in emotion_df.iterrows():
 								emotion_label = "%s " % (instance['emotion'])
 								emotion_score = instance['score']/100
-								
+								# Me quedo con la emoción dominante según el score
 								if index == 0:
 									dominant_emotion = "emotion: " + (instance['emotion']) +" percentage: "+ str(emotion_score)
-
-								ponderingEmotion(instance['emotion'], emotion_score)
-
-								addMovieToPlayList()
+								# Añado el score a mi listado de emociones
+								addScoreToEmotion(instance['emotion'], emotion_score)
+								# Compruebo si tengo que añadir un clip a la playlist según la puntuación añadida
+								checkClipToAddToPlayList()
 
 								bar_x = 35  # this is the size if an emotion is 100%
 								bar_x = int(bar_x * emotion_score)
 
+								# -------------------------------
+								# Pintado del label de emociones en la pantalla
 								if x+w+pivot_img_size < resolution_x:
 
 									text_location_y = y + 20 + (index+1) * 20
@@ -464,16 +517,20 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 
 										cv2.rectangle(freeze_img											, (x-pivot_img_size+70, y + 13 + (index+1) * 20)											,
 										              (x-pivot_img_size+70+bar_x, y + 13 + (index+1) * 20 + 5)											, (255, 255, 255), cv2.FILLED)
+								# -------------------------------
 
 							# -------------------------------
+										
+							# -------------------------------
+							# Analisis de edad en tiempo real
 
-							face_224 = functions.preprocess_face(img = custom_face, target_size = (224, 224), grayscale = False, enforce_detection = False, detector_backend = 'opencv')
+							face_224 = functions.preprocess_face(img = custom_face, target_size = (224, 224), grayscale = False, enforce_detection = False, detector_backend = detector_backend)
 
 							age_predictions = age_model.predict(face_224)[0,:]
 							apparent_age = Age.findApparentAge(age_predictions)
 
 							# -------------------------------
-
+							# Analisis de genero en tiempo real
 							gender_prediction = gender_model.predict(face_224)[0,:]
 
 							if np.argmax(gender_prediction) == 0:
@@ -484,9 +541,10 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 							print(str(int(apparent_age))," years old ", dominant_emotion, " ", gender)
 
 							analysis_report = str(int(apparent_age))+" "+gender
-
 							# -------------------------------
-
+							
+							# -------------------------------
+							# Dibujo la edad y el genero en pantalla
 							info_box_color = (46,200,255)
 
 							# top
@@ -518,131 +576,28 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 								cv2.rectangle(freeze_img, (x+int(w/5), y + h + int(pivot_img_size/3)), (x+w-int(w/5), y+h+pivot_img_size-int(pivot_img_size/5)), info_box_color, cv2.FILLED)
 
 								cv2.putText(freeze_img, analysis_report, (x+int(w/3.5), y + h + int(pivot_img_size/1.5)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 111, 255), 2)
-
-						# -------------------------------
-						# #face recognition
-
-						# custom_face = functions.preprocess_face(img = custom_face, target_size = (input_shape_y, input_shape_x), enforce_detection = False, detector_backend = 'opencv')
-
-						# #check preprocess_face function handled
-						# if custom_face.shape[1:3] == input_shape:
-						# 	if df.shape[0] > 0: #if there are images to verify, apply face recognition
-						# 		img1_representation = model.predict(custom_face)[0,:]
-
-						# 		#print(freezed_frame," - ",img1_representation[0:5])
-
-						# 		def findDistance(row):
-						# 			distance_metric = row['distance_metric']
-						# 			img2_representation = row['embedding']
-
-						# 			distance = 1000 #initialize very large value
-						# 			if distance_metric == 'cosine':
-						# 				distance = dst.findCosineDistance(img1_representation, img2_representation)
-						# 			elif distance_metric == 'euclidean':
-						# 				distance = dst.findEuclideanDistance(img1_representation, img2_representation)
-						# 			elif distance_metric == 'euclidean_l2':
-						# 				distance = dst.findEuclideanDistance(dst.l2_normalize(img1_representation), dst.l2_normalize(img2_representation))
-
-						# 			return distance
-
-						# 		df['distance'] = df.apply(findDistance, axis = 1)
-						# 		df = df.sort_values(by = ["distance"])
-
-						# 		candidate = df.iloc[0]
-						# 		employee_name = candidate['employee']
-						# 		best_distance = candidate['distance']
-
-						# 		#print(candidate[['employee', 'distance']].values)
-
-						# 		#if True:
-						# 		if best_distance <= threshold:
-						# 			#print(employee_name)
-						# 			display_img = cv2.imread(employee_name)
-
-						# 			display_img = cv2.resize(display_img, (pivot_img_size, pivot_img_size))
-
-						# 			label = employee_name.split("/")[-1].replace(".jpg", "")
-						# 			label = re.sub('[0-9]', '', label)
-
-						# 			try:
-						# 				if y - pivot_img_size > 0 and x + w + pivot_img_size < resolution_x:
-						# 					#top right
-						# 					freeze_img[y - pivot_img_size:y, x+w:x+w+pivot_img_size] = display_img
-
-						# 					overlay = freeze_img.copy(); opacity = 0.4
-						# 					cv2.rectangle(freeze_img,(x+w,y),(x+w+pivot_img_size, y+20),(46,200,255),cv2.FILLED)
-						# 					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
-
-						# 					cv2.putText(freeze_img, label, (x+w, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-						# 					#connect face and text
-						# 					cv2.line(freeze_img,(x+int(w/2), y), (x+3*int(w/4), y-int(pivot_img_size/2)),(67,67,67),1)
-						# 					cv2.line(freeze_img, (x+3*int(w/4), y-int(pivot_img_size/2)), (x+w, y - int(pivot_img_size/2)), (67,67,67),1)
-
-						# 				elif y + h + pivot_img_size < resolution_y and x - pivot_img_size > 0:
-						# 					#bottom left
-						# 					freeze_img[y+h:y+h+pivot_img_size, x-pivot_img_size:x] = display_img
-
-						# 					overlay = freeze_img.copy(); opacity = 0.4
-						# 					cv2.rectangle(freeze_img,(x-pivot_img_size,y+h-20),(x, y+h),(46,200,255),cv2.FILLED)
-						# 					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
-
-						# 					cv2.putText(freeze_img, label, (x - pivot_img_size, y+h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-						# 					#connect face and text
-						# 					cv2.line(freeze_img,(x+int(w/2), y+h), (x+int(w/2)-int(w/4), y+h+int(pivot_img_size/2)),(67,67,67),1)
-						# 					cv2.line(freeze_img, (x+int(w/2)-int(w/4), y+h+int(pivot_img_size/2)), (x, y+h+int(pivot_img_size/2)), (67,67,67),1)
-
-						# 				elif y - pivot_img_size > 0 and x - pivot_img_size > 0:
-						# 					#top left
-						# 					freeze_img[y-pivot_img_size:y, x-pivot_img_size:x] = display_img
-
-						# 					overlay = freeze_img.copy(); opacity = 0.4
-						# 					cv2.rectangle(freeze_img,(x- pivot_img_size,y),(x, y+20),(46,200,255),cv2.FILLED)
-						# 					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
-
-						# 					cv2.putText(freeze_img, label, (x - pivot_img_size, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-						# 					#connect face and text
-						# 					cv2.line(freeze_img,(x+int(w/2), y), (x+int(w/2)-int(w/4), y-int(pivot_img_size/2)),(67,67,67),1)
-						# 					cv2.line(freeze_img, (x+int(w/2)-int(w/4), y-int(pivot_img_size/2)), (x, y - int(pivot_img_size/2)), (67,67,67),1)
-
-						# 				elif x+w+pivot_img_size < resolution_x and y + h + pivot_img_size < resolution_y:
-						# 					#bottom righ
-						# 					freeze_img[y+h:y+h+pivot_img_size, x+w:x+w+pivot_img_size] = display_img
-
-						# 					overlay = freeze_img.copy(); opacity = 0.4
-						# 					cv2.rectangle(freeze_img,(x+w,y+h-20),(x+w+pivot_img_size, y+h),(46,200,255),cv2.FILLED)
-						# 					cv2.addWeighted(overlay, opacity, freeze_img, 1 - opacity, 0, freeze_img)
-
-						# 					cv2.putText(freeze_img, label, (x+w, y+h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
-
-						# 					#connect face and text
-						# 					cv2.line(freeze_img,(x+int(w/2), y+h), (x+int(w/2)+int(w/4), y+h+int(pivot_img_size/2)),(67,67,67),1)
-						# 					cv2.line(freeze_img, (x+int(w/2)+int(w/4), y+h+int(pivot_img_size/2)), (x+w, y+h+int(pivot_img_size/2)), (67,67,67),1)
-						# 			except Exception as err:
-						# 				print(str(err))
-
-						# tic = time.time() #in this way, freezed image can show 5 seconds
-
-						# #-------------------------------
-
+							# -------------------------------
+				
+				# -------------------------------				
+				# Dibujo el tiempo restante para el siguiente análisis de una imagen capturada
 				time_left = int(time_threshold - (toc - tic) + 1)
 
 				cv2.rectangle(freeze_img, (10, 10), (90, 50), (67,67,67), -10)
 				cv2.putText(freeze_img, str(time_left), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
+				# -------------------------------
 
 				cv2.imshow('img', freeze_img)
 
 				freezed_frame = freezed_frame + 1
+			# Ha pasado el umbral de tiempo para detectar y procesar las caras reiniciamos para poder empezar de nuevo
 			else:
 				face_detected = False
 				face_included_frames = 0
 				freeze = False
 				freezed_frame = 0
-
+		# He terminado de procesar la imagen añado el clip a la play list
 		else:
-			addMovieToPlayList()
+			checkClipToAddToPlayList()
 			cv2.imshow('img',img)
 
 		if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
@@ -652,27 +607,29 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	cap.release()
 	cv2.destroyAllWindows()
 
-#Post Process decisions
+# POST PROCESS DECISIONS
 
-def checkMovieChosen(movie):
-	for movieChosen in moviesChosen:
-		if movie.number == movieChosen.number:
+# Comprueba si el clip pertenece a uno de los que ha sido elegido
+def checkClipChosen(clip):
+	for clipChosen in clipsChosen:
+		if clip.number == clipChosen.number:
 			return True 
 	return False
 
+# Muestra los resultados de las decisiones obtenidas durante el proceso de análisis de usuarios 
 def getFinalDecisionChosen():
 	result = ''
 	for scene in range(numScenes):
-		result+='\r\n------------ Scene: '+str(scene)+' ----------------- \r\n'
+		result+='\r\n------------ Scene: '+str(scene+1)+' ----------------- \r\n'
 		result+='------------ Emotions Results ----------------- \r\n'
 		for emotionResult in list(emotionsByScene.get(scene, [])):
 			result+= emotionResult.toString() + '\r\n'
 		result+='------------ Graph Results ----------------- \r\n'
-		for movie in movie_files[scene]:
-			if checkMovieChosen(movie):
-				result += '**Chosen: ' + movie.toShortString()
+		for clip in clipFilesBySceneNumber[scene]:
+			if checkClipChosen(clip):
+				result += '**Chosen: ' + clip.toShortString()
 			else:
-				result += movie.toShortString()
+				result += clip.toShortString()
 			result += '\t'
 		result += '\r\n'
 	return result
@@ -682,6 +639,7 @@ def getImage(path):
    import matplotlib.pyplot as plt
    return OffsetImage(plt.imread(path, format="png"), zoom=.07)
 
+# Genera el QR con los clips que se haya escogido por los usuarios y por lo tanto de la rama resultante para poder compartir tu rama
 def generateQrCode(data):
 	# Importing library
 	import qrcode
@@ -698,14 +656,16 @@ def generateQrCode(data):
 						back_color = 'white')
 	img.save("qrcode.png")
 
+# Dibuja el grafo de decisiones tomadas
 def drawGraphFinalDecisionChosen():
 	import networkx as nx
 	import matplotlib.pyplot as plt
 	from matplotlib.offsetbox import AnnotationBbox
+	print("DRAW GRAPH DECISIONS")
 	# Crear un grafo vacío
 	G = nx.Graph()
-	moviesHasBeenChosen = []
-	objectsMoviesChosen = []
+	clipsHasBeenChosen = []
+	objectsClipsChosen = []
 	node_format = {'start.mp4': {'color':'red', 'size': 300} }
 	node_position = {'start.mp4': (13,75)}
 
@@ -714,37 +674,37 @@ def drawGraphFinalDecisionChosen():
 	fig, ax = plt.subplots()
 
 	# Agregar nodos al grafo
-	lastMovieChosen = 'start.mp4'
+	lastClipChosen = 'start.mp4'
 	G.add_node('start.mp4')
 	for scene in range(numScenes):
-
+		print("Scene: "+str(scene+1))
 		G.add_node("Scene: "+str(scene+1))
 		# Scene node position	
-		node_position["Scene: "+str(scene+1)] = ( ((scene+1) * 10) + 10 , 46 + len(movie_files[scene])*10 )
+		node_position["Scene: "+str(scene+1)] = ( ((scene+1) * 10) + 10 , 46 + len(clipFilesBySceneNumber[scene])*10 )
 		node_format["Scene: "+str(scene+1)] = {'color':'blue', 'size': 0}
 			
-		for index,movie in enumerate(movie_files[scene]):
+		for index,clip in enumerate(clipFilesBySceneNumber[scene]):
 			
-			node_position[movie.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
+			node_position[clip.toGraphString()] = ( ((scene+1) * 10) + 10 , (index*10) + 50 )
 
 			ab = AnnotationBbox(getImage("film.png"), ( ((scene+1) * 10) + 10 , (index*10) + 50 ), frameon=False)
 			ax.add_artist(ab)
 			
-			if checkMovieChosen(movie):
-				if len(moviesHasBeenChosen) > 0:
-					lastMovieChosen = moviesHasBeenChosen[len(moviesHasBeenChosen) -1]
-				G.add_node(movie.toGraphString())
-				G.add_edge(lastMovieChosen, movie.toGraphString())
-				moviesHasBeenChosen.append(movie.toGraphString())
-				objectsMoviesChosen.append(movie)
-				node_format[movie.toGraphString()] = {'color':'red', 'size': 300}
+			if checkClipChosen(clip):
+				if len(clipsHasBeenChosen) > 0:
+					lastClipChosen = clipsHasBeenChosen[len(clipsHasBeenChosen) -1]
+				G.add_node(clip.toGraphString())
+				G.add_edge(lastClipChosen, clip.toGraphString())
+				clipsHasBeenChosen.append(clip.toGraphString())
+				objectsClipsChosen.append(clip)
+				node_format[clip.toGraphString()] = {'color':'red', 'size': 300}
 			else:
-				G.add_node(movie.toGraphString())
-				node_format[movie.toGraphString()] = {'color':'blue', 'size': 300}
+				G.add_node(clip.toGraphString())
+				node_format[clip.toGraphString()] = {'color':'blue', 'size': 300}
 	
 	# Generar QR code
-	listIdsMovies = '-'.join(list(map(lambda x : str(x.number), objectsMoviesChosen)))
-	generateQrCode(listIdsMovies)
+	listIdsClips = '-'.join(list(map(lambda x : str(x.number), objectsClipsChosen)))
+	generateQrCode(listIdsClips)
 
 	# Qr code node graph
 	G.add_node("Share your decisions!")
@@ -762,20 +722,40 @@ def drawGraphFinalDecisionChosen():
 	plt.savefig("node-graph-decisions.png", dpi=100)
 	graph = player.media_new("node-graph-decisions.png")
 	media_list.add_media(graph)
-	media_player.set_media_list(media_list)
 	media_player.play()
 
-# addMovies()
+models = [
+  "VGG-Face", 
+  "Facenet", 
+  "Facenet512", 
+  "OpenFace", 
+  "DeepFace", 
+  "DeepID", 
+  "ArcFace", 
+  "Dlib", 
+  "SFace",
+]
 
-# testMoviesChosen()
+backends = [
+  'opencv', 
+  'ssd', 
+  'dlib', 
+  'mtcnn', 
+  'retinaface', 
+  'mediapipe'
+]
 
-# drawGraphFinalDecisionChosen()
+#addClips()
 
-addMovies()
+#testClipsChosen()
 
-startMovie()
+#drawGraphFinalDecisionChosen()
 
-analysis('',models[1], detector_backend=backends[3],time_threshold=0.1,frame_threshold=1)
+addClips()
+
+startClip()
+
+analysis('', "Facenet", detector_backend='opencv', time_threshold=0.1, frame_threshold=1)
 
 finalDecision = getFinalDecisionChosen()
 
