@@ -56,8 +56,8 @@ class Clip:
 	def toGraphString(self):
 		return str(self.numberScene)+'-'+self.path + ' E: '+ self.emotion + ' S: '+ str(self.score)
 
-# Testea la asignación de emociones a la película. Asigna aleatoriamente el valor emocional que queremos darle a una escena
-def testClipsChosen():
+# Asigna aleatoriamente el valor emocional que queremos darle a una escena
+def randomScoreForTestClipsChosen():
 	for numberScene in range(numScenes):
 		randomEmotion = selectRandomEmotion()
 		randomScore = selectRandomScore()
@@ -224,6 +224,8 @@ def startClip():
 	media_player.set_media_list(media_list)
 	# start playing video
 	media_player.play()
+	# set volume
+	media_player.get_media_player().audio_set_volume(20)
 
 """
 	1. Captura lo que se graba en la webcam o videocamara del ordenador.
@@ -301,8 +303,6 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 	# -----------------------
 
 	pbar = tqdm(range(0, len(employees)), desc='Finding embeddings')
-
-	# TODO: why don't you store those embeddings in a pickle file similar to find function?
 
 	embeddings = []
 	# for employee in employees:
@@ -393,7 +393,6 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 		# Se encuentra cara y los frames de la cara esta dentro del umbral para poder tratar la imagen y no se está procesando otra imagen
 		if face_detected == True and face_included_frames == frame_threshold and freeze == False:
 			freeze = True
-			# base_img = img.copy()
 			base_img = raw_img.copy()
 			detected_faces_final = detected_faces.copy()
 			tic = time.time()
@@ -422,7 +421,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 						custom_face = base_img[y:y+h, x:x+w]
 
 						# -------------------------------
-						# Analisis facial (emociones, edad, )
+						# Analisis facial (emociones, edad, genero)
 						if enable_face_analysis == True:
 							# Devuelve la imagen en gris habiendola pasado por una capa convolucional
 							gray_img = functions.preprocess_face(img=custom_face, target_size=(
@@ -483,7 +482,7 @@ def analysis(db_path, model_name='VGG-Face', detector_backend='opencv', distance
 								emotion_score = instance['score']/100
 								# Me quedo con la emoción dominante según el score
 								if index == 0:
-									dominant_emotion = "emotion: " + (instance['emotion']) +" percentage: "+ str(emotion_score)
+									dominant_emotion = "Dominant emotion: " + (instance['emotion']) +" percentage: "+ str(emotion_score)
 								# Añado el score a mi listado de emociones
 								addScoreToEmotion(instance['emotion'], emotion_score)
 								# Compruebo si tengo que añadir un clip a la playlist según la puntuación añadida
