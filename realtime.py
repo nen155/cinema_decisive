@@ -95,7 +95,7 @@ def getFileName(numberScene, numberEmotion):
 # Intenta que las emociones Neutrales sean las últimas en escogerse aumentando el número de puntuación a la que tiene que llegar el usuario para que la emoción sea Neutral
 def avoidingNeutralEmotion(currentEmotion, randomScore):
 	if currentEmotion == 'Neutral':
-		return randomScore * 3
+		return randomScore * 10
 	return randomScore
 	
 # Añade puntuación a la emoción concreta

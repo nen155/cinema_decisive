@@ -14,6 +14,7 @@ class Take extends Model
      */
     protected $fillable = [
         'id_father',
+        'id_scene',
         'id_emotion_section',
         'video_path',
         'duration'

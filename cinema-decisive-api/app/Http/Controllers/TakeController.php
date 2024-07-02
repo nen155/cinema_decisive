@@ -100,7 +100,7 @@ class TakeController extends Controller
             $take = json_decode($request->take);
 
             $takeCreated = Take::create([
-                'id_father'=> $take->id_father,
+                'id_father'=> isset($take->id_father) ? $take->id_father : null,
                 'id_scene'=> $take->id_scene,
                 'duration'=> $take->duration
             ]);
@@ -108,20 +108,25 @@ class TakeController extends Controller
             $imageObj = $this->saveImage($request, $takeCreated->id);
 
             if(isset($imageObj["image"])){
-                $takeCreated->image_path = "movies/".$request->id."_". $imageObj["path"];
+                $takeCreated->image_path = "thumbnails/".$takeCreated->id."_". $imageObj["path"].".jpg";
                 $takeCreated->save();
             }
 
             $videoObj = $this->saveVideo($request, $takeCreated->id);
 
             if(isset($videoObj["video"])){
-                $takeCreated->video_path = "movies/".$request->id."_". $videoObj["path"];
+                $takeCreated->video_path = "movies/".$takeCreated->id."_". $videoObj["path"];
                 $takeCreated->save();
+            }
+
+            foreach($take->emotions as $emotion){
+                $emotion->id_take = $takeCreated->id;
             }
 
             $this->saveEmotions($take->emotions);
 
-            return $takeCreated;
+            $returnTake = $this->toDto([$this->showTake($takeCreated->id)]);
+            return json_encode($returnTake[0]);
         } catch (\Exception $exception) {
             error_log($exception);
             return response()->json(['error'=> $exception->getMessage()],400);
@@ -139,27 +144,40 @@ class TakeController extends Controller
             $imageObj = $this->saveImage($request, $movie->id);
 
             if(isset($imageObj["image"])){
-                $movie->image_path = "movies/".$take->id."_". $imageObj["path"];
+                $movieName = "thumbnails/".$imageObj["path"];
+                if(!str_contains($movieName,'_')){
+                    $movieName = "thumbnails/". $take->id."_". $imageObj["path"].".jpg";
+                }
+
+                $movie->image_path = $movieName.".jpg";
             }
 
             $videoObj = $this->saveVideo($request, $movie->id);
 
             if(isset($videoObj["video"])){
-                $movie->video_path = "movies/".$take->id."_". $videoObj["path"];
+                $movieName ="movies/".$videoObj["path"];
+                if(!str_contains($movieName,'_')){
+                    $movieName = "movies/". $take->id."_". $videoObj["path"];
+                }
+
+                $movie->video_path = $movieName;
             }
 
             $this->saveEmotions($take->emotions);
 
-            return $movie->save();
+            $movie->save();
+
+            $returnTake = $this->toDto([$this->showTake($movie->id)]);
+            return json_encode($returnTake[0]);
         } catch (\Exception $exception) {
             error_log($exception);
             return response()->json(['error'=> $exception->getMessage()],400);
         }
     }
 
-    public function delete($id){
+    public function delete($idTake){
         try{
-            return DB::table('take')->where('id', '=', $id)->delete();
+            return DB::table('take')->where('id', '=', $idTake)->delete();
         }catch(\Exception $exception){
             error_log($exception);
         }
@@ -197,8 +215,12 @@ class TakeController extends Controller
         $image = $request->file('image');
         if(isset($image)){
             $name = $image->getClientOriginalName();
+            $movieName= $name.".jpg";
+            if(!str_contains($name,'_')){
+                $movieName = $idMovie."_". $name.".jpg";
+            }
             $image->store('public/uploads');
-            $image->move(public_path('movies'), $idMovie."_". $name);
+            $image->move(public_path('thumbnails'), $movieName);
             $path = $name;
             return ["image"=>$image, "path" => $path, "name" => $name];
         }
@@ -209,10 +231,14 @@ class TakeController extends Controller
         $video = $request->file('video');
         if(isset($video)){
             $name = $video->getClientOriginalName();
+            $movieName= $name;
+            if(!str_contains($name,'_')){
+                $movieName = $idMovie."_". $name;
+            }
             $video->store('public/uploads');
-            $video->move(public_path('movies'), $idMovie."_". $name);
+            $video->move(public_path('movies'), $movieName);
             $path = $name;
-            return ["movie"=>$video, "path" => $path, "name" => $name];
+            return ["video"=>$video, "path" => $path, "name" => $name];
         }
        return [];
     }
